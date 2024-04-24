@@ -9,6 +9,7 @@ type length_or_files =
 
 type t = {
   announce : string;
+  info_hash : Sha1.t;
   name : string;
   piece_length : int64;
   pieces : Sha1.t list;
@@ -29,7 +30,14 @@ let parse file =
       match announce, info with
       | None, _ -> raise Parse_error
       | _, None -> raise Parse_error
-      | Some (String announce), Some (Dict info) ->
+      | Some (String announce), Some (Dict info as orig) ->
+          let info_hash =
+            (* TODO: we could be more efficient if the bencode library kept around the original *)
+            (* TODO: this is also discouraged by the spec *)
+            let buf = Buffer.create 1024 in
+            Bencode.encode (`Buffer buf) orig;
+            Sha1.string (Buffer.contents buf)
+          in
           let name = List.assoc_opt "name" info in
           let piece_length = List.assoc_opt "piece length" info in
           let pieces = List.assoc_opt "pieces" info in
@@ -81,6 +89,7 @@ let parse file =
               in
               {
                 announce;
+                info_hash;
                 name;
                 piece_length;
                 pieces;
@@ -90,10 +99,11 @@ let parse file =
           end
       | Some _, Some _ -> raise Parse_error
 
-let print {announce; name; piece_length; pieces; length_or_files} =
+let print {announce; info_hash; name; piece_length; pieces; length_or_files} =
   print_endline ("announce: " ^ announce);
+  print_endline ("info_hash: " ^ Sha1.to_hex info_hash);
   print_endline ("name: " ^ name);
-  print_endline ("piece_length: " ^ Int64.to_string piece_length);
+  print_endline ("piece length: " ^ Int64.to_string piece_length);
   print_endline "pieces:";
   List.iter (fun hash -> print_endline ("- " ^ Sha1.to_hex hash)) pieces;
   match length_or_files with

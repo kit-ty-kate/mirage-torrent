@@ -1,4 +1,20 @@
-type t
+type file = {
+  length : int64;
+  path : string list;
+}
+
+type length_or_files =
+  | Length of int64
+  | Files of file list
+
+type t = {
+  announce : string;
+  info_hash : Sha1.t;
+  name : string;
+  piece_length : int64;
+  pieces : Sha1.t list;
+  length_or_files : length_or_files;
+}
 
 exception Parse_error
 

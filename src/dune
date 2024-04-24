@@ -1,3 +1,7 @@
 (executable
  (name main)
- (libraries bencode sha))
+ (libraries
+  bencode
+  sha
+;  logs.fmt
+  http-lwt-client))
