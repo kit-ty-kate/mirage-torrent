@@ -9,10 +9,10 @@ type length_or_files =
 
 type t = {
   announce : string;
-  info_hash : Sha1.t;
+  info_hash : Digestif.SHA1.t;
   name : string;
   piece_length : int64;
-  pieces : Sha1.t list;
+  pieces : Digestif.SHA1.t list;
   length_or_files : length_or_files;
 }
 
@@ -36,7 +36,7 @@ let parse file =
             (* TODO: this is also discouraged by the spec *)
             let buf = Buffer.create 1024 in
             Bencode.encode (`Buffer buf) orig;
-            Sha1.string (Buffer.contents buf)
+            Digestif.SHA1.digest_string (Buffer.contents buf)
           in
           let name = List.assoc_opt "name" info in
           let piece_length = List.assoc_opt "piece length" info in
@@ -84,7 +84,7 @@ let parse file =
                 List.init (String.length pieces / 20) (fun i ->
                   let n = i * 20 in
                   let sha1_bin = String.sub pieces n 20 in
-                  Sha1.of_bin (String.to_bytes sha1_bin)
+                  Digestif.SHA1.of_raw_string sha1_bin
                 )
               in
               {
@@ -101,11 +101,11 @@ let parse file =
 
 let print {announce; info_hash; name; piece_length; pieces; length_or_files} =
   print_endline ("announce: " ^ announce);
-  print_endline ("info_hash: " ^ Sha1.to_hex info_hash);
+  print_endline ("info_hash: " ^ Digestif.SHA1.to_hex info_hash);
   print_endline ("name: " ^ name);
   print_endline ("piece length: " ^ Int64.to_string piece_length);
   print_endline "pieces:";
-  List.iter (fun hash -> print_endline ("- " ^ Sha1.to_hex hash)) pieces;
+  List.iter (fun hash -> print_endline ("- " ^ Digestif.SHA1.to_hex hash)) pieces;
   match length_or_files with
   | Length length ->
       print_endline ("length: " ^ Int64.to_string length);

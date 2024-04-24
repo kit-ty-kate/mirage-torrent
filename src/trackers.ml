@@ -7,7 +7,7 @@ let request {Torrent_file.announce; info_hash; _} =
     Logs.set_reporter (Logs_fmt.reporter ()); *)
   let url =
     Uri.add_query_params' (Uri.of_string announce) [
-      "info_hash", Sha1.to_bin info_hash;
+      "info_hash", Digestif.SHA1.to_raw_string info_hash;
       "peer_id", String.init 20 (fun _ -> Char.chr (Random.int 128));
       "port", "6881";
       "uploaded", "0";

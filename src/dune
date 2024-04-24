@@ -2,7 +2,7 @@
  (name main)
  (libraries
   bencode
-  sha
+  digestif.ocaml
 ;  logs.fmt
   http-lwt-client
   uri))

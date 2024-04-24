@@ -9,10 +9,10 @@ type length_or_files =
 
 type t = {
   announce : string;
-  info_hash : Sha1.t;
+  info_hash : Digestif.SHA1.t;
   name : string;
   piece_length : int64;
-  pieces : Sha1.t list;
+  pieces : Digestif.SHA1.t list;
   length_or_files : length_or_files;
 }
 
