@@ -1,5 +1,3 @@
-open Lwt.Infix
-
 let () = Random.self_init ()
 
 type peer = {
@@ -13,7 +11,9 @@ type t = {
   peers : peer list;
 }
 
-let request {Torrent_file.announce; info_hash; _} =
+exception Request_error
+
+let request ~resolver {Torrent_file.announce; info_hash; _} =
 (*  Logs.set_level (Some Logs.Debug);
     Logs.set_reporter (Logs_fmt.reporter ()); *)
   let url =
@@ -27,19 +27,19 @@ let request {Torrent_file.announce; info_hash; _} =
       "compact", "1"; (* NOTE: see http://www.bittorrent.org/beps/bep_0023.html *)
     ]
   in
-  Http_lwt_client.request ~meth:`GET ~follow_redirect:true (Uri.to_string url) (fun _resp acc str ->
-    (* TODO: use resp *)
-    Lwt.return (acc ^ str)
-  ) "" >>= function
+  match
+    Httpcats.request ~meth:`GET ~follow_redirect:true ~resolver ~uri:(Uri.to_string url) ~f:(fun _resp acc body ->
+      acc ^ body
+    ) ""
+  with
   | Ok (_resp, body) ->
       (* TODO: use resp *)
-      (* TODO have a better exception and get rid of Lwt to get nice backtraces *)
       begin match Bencode.decode (`String body) with
       | Dict body ->
           begin match List.assoc_opt "failure reason" body with
           | Some (String failure_reason) ->
-              failwith failure_reason
-          | Some _ -> failwith "wrong failure reason type"
+              Error (`Msg failure_reason)
+          | Some _ -> raise Request_error
           | None ->
               let interval = List.assoc_opt "interval" body in
               let peers = List.assoc_opt "peers" body in
@@ -47,9 +47,9 @@ let request {Torrent_file.announce; info_hash; _} =
               | Some (Integer interval), Some (List peers) ->
                   let peers =
                     List.map (function
-                      | Bencode.Integer _ -> failwith "a"
-                      | Bencode.String _ -> failwith "b"
-                      | Bencode.List _ -> failwith "c"
+                      | Bencode.Integer _ -> raise Request_error
+                      | Bencode.String _ -> raise Request_error
+                      | Bencode.List _ -> raise Request_error
                       | Bencode.Dict peer ->
                           let peer_id = List.assoc_opt "peer id" peer in
                           let ip = List.assoc_opt "ip" peer in
@@ -62,37 +62,37 @@ let request {Torrent_file.announce; info_hash; _} =
                               (* see http://www.bittorrent.org/beps/bep_0023.html *)
                               let peer_id = match peer_id with
                                 | Some (String peer_id) -> Some peer_id
-                                | Some _ -> failwith "d"
+                                | Some _ -> raise Request_error
                                 | None -> None
                               in
                               let ip = Ipaddr.V4.of_string_exn ip in
                               let port = Int64.to_int port in
                               {peer_id; ip; port}
-                          | None, _ -> failwith "e"
-                          | _, None -> failwith "f"
-                          | Some _, Some _ -> failwith "g"
+                          | None, _ -> raise Request_error
+                          | _, None -> raise Request_error
+                          | Some _, Some _ -> raise Request_error
                     ) peers
                   in
-                  Lwt.return {interval; peers}
+                  Ok {interval; peers}
               | Some (Integer interval), Some (String peers) ->
                   let peers =
                     List.init (String.length peers / 6) (fun i ->
-                      let n = i * 6 in
-                      let ip = Ipaddr.V4.of_octets_exn (String.sub peers n 4) in
-                      let port = String.get_uint16_be peers 4 in
+                      let off = i * 6 in
+                      let ip = Ipaddr.V4.of_octets_exn ~off peers in
+                      let port = String.get_uint16_be peers (off + 4) in
                       {peer_id = None; ip; port}
                     )
                   in
-                  Lwt.return {interval; peers}
-              | Some _, Some _ -> failwith "h"
-              | None, _ -> failwith "i"
-              | _, None -> failwith "j"
+                  Ok {interval; peers}
+              | Some _, Some _ -> raise Request_error
+              | None, _ -> raise Request_error
+              | _, None -> raise Request_error
           end
-      | Integer _ -> failwith "integer"
-      | String _ -> failwith "string"
-      | List _ -> failwith "list"
+      | Integer _ -> raise Request_error
+      | String _ -> raise Request_error
+      | List _ -> raise Request_error
       end
-  | Error `Msg msg -> failwith msg
+  | Error e -> Error (`Msg (Format.asprintf "%a" Httpcats.pp_error e))
 
 let print {interval; peers} =
   print_endline ("interval: " ^ Int64.to_string interval);

@@ -4,6 +4,8 @@
   bencode
   digestif.ocaml
 ;  logs.fmt
-  http-lwt-client
+  dns-miou
+  httpcats
+  mirage-crypto-rng.unix
   ipaddr
   uri))
