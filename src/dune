@@ -3,7 +3,9 @@
  (libraries
   bencode
   digestif.ocaml
+  mirage-crypto-rng.unix
 ;  logs.fmt
+  dns-miou
   httpcats
   ipaddr
   uri))

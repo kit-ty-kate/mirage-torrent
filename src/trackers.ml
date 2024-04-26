@@ -11,7 +11,7 @@ type t = {
   peers : peer list;
 }
 
-let request {Torrent_file.announce; info_hash; _} =
+let request ~resolver {Torrent_file.announce; info_hash; _} =
 (*  Logs.set_level (Some Logs.Debug);
     Logs.set_reporter (Logs_fmt.reporter ()); *)
   let url =
@@ -26,7 +26,6 @@ let request {Torrent_file.announce; info_hash; _} =
     ]
   in
   match
-    let _daemon, resolver = Happy.stack () in
     Httpcats.request ~meth:`GET ~follow_redirect:true ~resolver ~uri:(Uri.to_string url) ~f:(fun _resp acc str ->
       (* TODO: use resp *)
       acc ^ str
