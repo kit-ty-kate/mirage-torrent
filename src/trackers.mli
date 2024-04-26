@@ -1,1 +1,5 @@
-val request : Torrent_file.t -> unit Lwt.t
+type t
+
+val request : Torrent_file.t -> t Lwt.t
+
+val print : t -> unit

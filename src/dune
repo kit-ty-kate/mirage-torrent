@@ -5,4 +5,5 @@
   digestif.ocaml
 ;  logs.fmt
   http-lwt-client
+  ipaddr
   uri))
