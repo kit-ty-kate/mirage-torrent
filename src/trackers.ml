@@ -28,9 +28,12 @@ let request {Torrent_file.announce; info_hash; _} =
     ]
   in
   Http_lwt_client.request ~meth:`GET ~follow_redirect:true (Uri.to_string url) (fun _resp acc str ->
+    (* TODO: use resp *)
     Lwt.return (acc ^ str)
   ) "" >>= function
   | Ok (_resp, body) ->
+      (* TODO: use resp *)
+      (* TODO have a better exception and get rid of Lwt to get nice backtraces *)
       begin match Bencode.decode (`String body) with
       | Dict body ->
           begin match List.assoc_opt "failure reason" body with
