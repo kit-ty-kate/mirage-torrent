@@ -4,6 +4,6 @@
   bencode
   digestif.ocaml
 ;  logs.fmt
-  http-lwt-client
+  httpcats
   ipaddr
   uri))

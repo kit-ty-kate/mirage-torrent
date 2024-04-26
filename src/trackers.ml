@@ -1,5 +1,3 @@
-open Lwt.Infix
-
 let () = Random.self_init ()
 
 type peer = {
@@ -27,10 +25,13 @@ let request {Torrent_file.announce; info_hash; _} =
       "compact", "1"; (* NOTE: see http://www.bittorrent.org/beps/bep_0023.html *)
     ]
   in
-  Http_lwt_client.request ~meth:`GET ~follow_redirect:true (Uri.to_string url) (fun _resp acc str ->
-    (* TODO: use resp *)
-    Lwt.return (acc ^ str)
-  ) "" >>= function
+  match
+    let _daemon, resolver = Happy.stack () in
+    Httpcats.request ~meth:`GET ~follow_redirect:true ~resolver ~uri:(Uri.to_string url) ~f:(fun _resp acc str ->
+      (* TODO: use resp *)
+      acc ^ str
+    ) ""
+  with
   | Ok (_resp, body) ->
       (* TODO: use resp *)
       (* TODO have a better exception and get rid of Lwt to get nice backtraces *)
@@ -73,7 +74,7 @@ let request {Torrent_file.announce; info_hash; _} =
                           | Some _, Some _ -> failwith "g"
                     ) peers
                   in
-                  Lwt.return {interval; peers}
+                  {interval; peers}
               | Some (Integer interval), Some (String peers) ->
                   let peers =
                     List.init (String.length peers / 6) (fun i ->
@@ -83,7 +84,7 @@ let request {Torrent_file.announce; info_hash; _} =
                       {peer_id = None; ip; port}
                     )
                   in
-                  Lwt.return {interval; peers}
+                  {interval; peers}
               | Some _, Some _ -> failwith "h"
               | None, _ -> failwith "i"
               | _, None -> failwith "j"
@@ -92,7 +93,7 @@ let request {Torrent_file.announce; info_hash; _} =
       | String _ -> failwith "string"
       | List _ -> failwith "list"
       end
-  | Error `Msg msg -> failwith msg
+  | Error e -> failwith (Format.asprintf "%a" Httpcats.pp_error e)
 
 let print {interval; peers} =
   print_endline ("interval: " ^ Int64.to_string interval);
