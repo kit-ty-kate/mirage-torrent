@@ -11,7 +11,7 @@ type t = {
 
 exception Request_error
 
-val request : resolver:Happy.stack -> Torrent_file.t -> (t, [`Msg of string]) result
+val request : Torrent_file.t -> (t, [`Msg of string]) result
 (** NOTE: raises effects *)
 
 val print : t -> unit

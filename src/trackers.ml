@@ -13,14 +13,14 @@ type t = {
 
 exception Request_error
 
-let request ~resolver {Torrent_file.announce; info_hash; _} =
+let request {Torrent_file.announce; info_hash; _} =
 (*  Logs.set_level (Some Logs.Debug);
     Logs.set_reporter (Logs_fmt.reporter ()); *)
   let url =
     Uri.add_query_params' (Uri.of_string announce) [
       "info_hash", Digestif.SHA1.to_raw_string info_hash;
       "peer_id", String.init 20 (fun _ -> Char.chr (Random.int 128));
-      "port", "6881";
+      "port", "6881"; (* TODO: change this *)
       "uploaded", "0";
       "downloaded", "0";
       "left", "0";
@@ -28,7 +28,7 @@ let request ~resolver {Torrent_file.announce; info_hash; _} =
     ]
   in
   match
-    Httpcats.request ~meth:`GET ~follow_redirect:true ~resolver ~uri:(Uri.to_string url) ~f:(fun _resp acc body ->
+    Httpcats.request ~meth:`GET ~follow_redirect:true ~uri:(Uri.to_string url) ~f:(fun _resp acc body ->
       acc ^ body
     ) ""
   with
