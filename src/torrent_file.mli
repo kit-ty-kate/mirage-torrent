@@ -9,6 +9,7 @@ type length_or_files =
 
 type t = {
   announce : string;
+  peer_id : string;
   info_hash : Digestif.SHA1.t;
   name : string;
   piece_length : int64;

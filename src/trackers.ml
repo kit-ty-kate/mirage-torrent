@@ -1,5 +1,3 @@
-let () = Random.self_init ()
-
 type peer = {
   peer_id : string option;
   ip : Ipaddr.V4.t;
@@ -13,13 +11,13 @@ type t = {
 
 exception Request_error
 
-let request {Torrent_file.announce; info_hash; _} =
+let request {Torrent_file.announce; peer_id; info_hash; _} =
 (*  Logs.set_level (Some Logs.Debug);
     Logs.set_reporter (Logs_fmt.reporter ()); *)
   let url =
     Uri.add_query_params' (Uri.of_string announce) [
       "info_hash", Digestif.SHA1.to_raw_string info_hash;
-      "peer_id", String.init 20 (fun _ -> Char.chr (Random.int 128));
+      "peer_id", peer_id;
       "port", "6881"; (* TODO: change this *)
       "uploaded", "0";
       "downloaded", "0";

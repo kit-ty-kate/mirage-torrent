@@ -1,3 +1,5 @@
+let () = Random.self_init ()
+
 type file = {
   length : int64;
   path : string list;
@@ -9,6 +11,7 @@ type length_or_files =
 
 type t = {
   announce : string;
+  peer_id : string;
   info_hash : Digestif.SHA1.t;
   name : string;
   piece_length : int64;
@@ -89,6 +92,7 @@ let parse file =
               in
               {
                 announce;
+                peer_id = String.init 20 (fun _ -> Char.chr (Random.int 128));
                 info_hash;
                 name;
                 piece_length;
@@ -99,8 +103,9 @@ let parse file =
           end
       | Some _, Some _ -> raise Parse_error
 
-let print {announce; info_hash; name; piece_length; pieces; length_or_files} =
+let print {announce; peer_id; info_hash; name; piece_length; pieces; length_or_files} =
   print_endline ("announce: " ^ announce);
+  print_endline ("peer_id: " ^ peer_id);
   print_endline ("info_hash: " ^ Digestif.SHA1.to_hex info_hash);
   print_endline ("name: " ^ name);
   print_endline ("piece length: " ^ Int64.to_string piece_length);
