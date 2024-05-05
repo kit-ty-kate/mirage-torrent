@@ -96,11 +96,10 @@ let read_message fd =
 
 let request_the_entire_torrent torrent_output socket =
   Torrent_output.iter_subpieces (fun i off len ->
-    print_endline "wtf";
-    Miou_unix.sleep 5.0;
+    (*    Miou_unix.sleep 1.0; *)
     Printf.printf "Request one more...(%d, %d, %d)\n" i off len;
-    Miou_unix.write socket "\000\000\000\014\006"; (* NOTE: request *)
-    let buf = Bytes.create 13 in
+    Miou_unix.write socket "\000\000\000\013\006"; (* NOTE: request *)
+    let buf = Bytes.create 12 in
     Bytes.set_int32_be buf 0 (Int32.of_int i);
     Bytes.set_int32_be buf 4 (Int32.of_int off);
     Bytes.set_int32_be buf 8 (Int32.of_int len);
