@@ -15,6 +15,22 @@ let () =
         (* TODO: use more peers *)
         (* TODO: use interval *)
         let peer = List.find (fun peer -> String.equal (Ipaddr.V4.to_string peer.Trackers.ip) test_ip) tracker_resp.Trackers.peers in
-        Peer_protocol.talk torrent peer
+        let torrent_output = Torrent_output.create torrent in
+        let proto = Peer_protocol.connect torrent torrent_output peer in
+        Peer_protocol.unchoke proto;
+        Peer_protocol.interested proto;
+        Torrent_output.iter_subpieces (Peer_protocol.request proto) torrent_output;
+        let test =
+          Miou.call_cc (fun () ->
+            let finished = ref false in
+            while not !finished do
+              Miou_unix.sleep 5.0;
+              finished := Torrent_output.checksum torrent_output;
+            done
+          )
+        in
+        Miou.await_exn test;
+        print_endline "Finished downloading.";
+        Peer_protocol.close proto
     | Error (`Msg msg) -> prerr_endline ("Error: " ^ msg)
   )

@@ -6,4 +6,4 @@ val iter_subpieces : (int -> int -> int -> unit) -> t -> unit
 
 val set_subpiece : t -> index:int -> offset:int -> string -> unit
 
-val test : t -> unit
+val checksum : t -> bool

@@ -16,6 +16,13 @@ type message =
   | Piece of {index : int32; offset : int32; piece : string}
   | Cancel of index
 
+type t = {
+  socket : Miou_unix.file_descr;
+  torrent_output : Torrent_output.t;
+  read_messages : unit Miou.Promise.t;
+  send_keepalives : unit Miou.Promise.t;
+}
+
 let bt_header = "\019BitTorrent protocol"
 let bt_reserved_bytes = String.make 8 '\000'
 
@@ -40,7 +47,6 @@ let read_handshake fd fixed_handshake =
     failwith ("?? " ^ Bytes.to_string buf)
 
 let send_keepalive fd =
-  print_endline "send keepalive";
   Miou_unix.write fd "\000\000\000\000"
 
 let read_message fd =
@@ -94,96 +100,86 @@ let read_message fd =
           failwith "unsupported length for Cancel message"
     | _ -> failwith "unknown message"
 
-let request_the_entire_torrent torrent_output socket =
-  Torrent_output.iter_subpieces (fun i off len ->
-    (*    Miou_unix.sleep 1.0; *)
-    Printf.printf "Request one more...(%d, %d, %d)\n" i off len;
-    Miou_unix.write socket "\000\000\000\013\006"; (* NOTE: request *)
-    let buf = Bytes.create 12 in
-    Bytes.set_int32_be buf 0 (Int32.of_int i);
-    Bytes.set_int32_be buf 4 (Int32.of_int off);
-    Bytes.set_int32_be buf 8 (Int32.of_int len);
-    Miou_unix.write socket (Bytes.unsafe_to_string buf);
-    print_endline "request one sent";
-  ) torrent_output
-
-let talk torrent_file {Trackers.ip; port; _} =
+let connect torrent_file torrent_output {Trackers.ip; port; _} =
   let socket = Miou_unix.tcpv4 () in
-  Fun.protect ~finally:(fun () -> Miou_unix.close socket) @@ fun () ->
-  let sockaddr = Unix.ADDR_INET (Unix.inet_addr_of_string (Ipaddr.V4.to_string ip), port) in
-  Miou_unix.connect socket sockaddr;
-  (* NOTE: see http://www.bittorrent.org/beps/bep_0003.html *)
-  let fixed_handshake = bt_fixed_handshake torrent_file.Torrent_file.info_hash in
-  let write_handshake =
-    Miou.call_cc (fun () -> write_handshake socket fixed_handshake torrent_file.Torrent_file.peer_id)
-  in
-  let read_handshake = Miou.call_cc (fun () -> read_handshake socket fixed_handshake) in
-  Miou.await_exn write_handshake;
-  let _client_peer_id = Miou.await_exn read_handshake in
-  (* TODO: use client_peer_id ? *)
-  let torrent_output = Torrent_output.create torrent_file in
-  let send_keepalives =
-    Miou.call_cc (fun () ->
-      Miou_unix.sleep 1.0;
-      Miou_unix.write socket "\000\000\000\001\001"; (* NOTE: unchoke *)
-      Miou_unix.sleep 1.0;
-      Miou_unix.write socket "\000\000\000\001\002"; (* NOTE: interested *)
-      while true do (* TODO: Have a way to stop this program *)
-        send_keepalive socket;
-        Miou_unix.sleep 120.0;
-      done
-    )
-  in
-  let read_messages =
-    Miou.call_cc (fun () ->
-      while true do
-        print_endline "reading message..";
-        match read_message socket with
-        | Keepalive ->
-            print_endline "keepalive";
-        | Choke ->
-            print_endline "choke";
-        | Unchoke ->
-            print_endline "unchoke";
-        | Interested ->
-            print_endline "interested";
-        | Not_interested ->
-            print_endline "not interested";
-        | Have _ ->
-            print_endline "have";
-        | Bitfield _ ->
-            print_endline "bitfield"
-        | Request _ ->
-            print_endline "request";
-        | Piece {index; offset; piece} ->
-            print_endline "piece";
-            let index = Int32.to_int index in (* TODO: do we need int32 and int64 datatypes? *)
-            let offset = Int32.to_int offset in (* TODO: do we need int32 and int64 datatypes? *)
-            Torrent_output.set_subpiece torrent_output ~index ~offset piece;
-            print_endline "successfully set piece";
-        | Cancel _ ->
-            print_endline "cancel"
-      done
-    )
-  in
-  let check_received =
-    Miou.call_cc (fun () ->
-      while true do
-        Miou_unix.sleep 120.0;
-        Torrent_output.test torrent_output;
-      done
-    )
-  in
-  let test_requesting =
-    Miou.call_cc (fun () ->
-      Miou_unix.sleep 5.0;
-      print_endline "requesting...";
-      request_the_entire_torrent torrent_output socket;
-      print_endline "requested...";
-    )
-  in
-  Miou.await_exn read_messages;
-  Miou.await_exn send_keepalives;
-  Miou.await_exn check_received;
-  Miou.await_exn test_requesting
+  try
+    let sockaddr = Unix.ADDR_INET (Unix.inet_addr_of_string (Ipaddr.V4.to_string ip), port) in
+    Miou_unix.connect socket sockaddr;
+    (* NOTE: see http://www.bittorrent.org/beps/bep_0003.html *)
+    let fixed_handshake = bt_fixed_handshake torrent_file.Torrent_file.info_hash in
+    let write_handshake =
+      Miou.call_cc (fun () -> write_handshake socket fixed_handshake torrent_file.Torrent_file.peer_id)
+    in
+    let read_handshake = Miou.call_cc (fun () -> read_handshake socket fixed_handshake) in
+    Miou.await_exn write_handshake;
+    let _client_peer_id = Miou.await_exn read_handshake in
+    (* TODO: use client_peer_id ? *)
+    let send_keepalives =
+      Miou.call_cc (fun () ->
+        while true do
+          send_keepalive socket;
+          Miou_unix.sleep 120.0;
+        done
+      )
+    in
+    let read_messages =
+      Miou.call_cc (fun () ->
+        while true do
+          match read_message socket with
+          | Keepalive ->
+              print_endline "keepalive";
+          | Choke ->
+              print_endline "choke";
+          | Unchoke ->
+              print_endline "unchoke";
+          | Interested ->
+              print_endline "interested";
+          | Not_interested ->
+              print_endline "not interested";
+          | Have _ ->
+              print_endline "have";
+          | Bitfield _ ->
+              print_endline "bitfield"
+          | Request _ ->
+              print_endline "request";
+          | Piece {index; offset; piece} ->
+              print_endline "piece";
+              let index = Int32.to_int index in (* TODO: do we need int32 and int64 datatypes? *)
+              let offset = Int32.to_int offset in (* TODO: do we need int32 and int64 datatypes? *)
+              Torrent_output.set_subpiece torrent_output ~index ~offset piece;
+          | Cancel _ ->
+              print_endline "cancel"
+        done
+      )
+    in
+    {socket; torrent_output; read_messages; send_keepalives}
+  with e ->
+    let bt = Printexc.get_raw_backtrace () in
+    Miou_unix.close socket;
+    Printexc.raise_with_backtrace e bt
 (* TODO: support uploads *)
+
+let unchoke {socket; _} =
+  Miou_unix.write socket "\000\000\000\001\001"
+
+let interested {socket; _} =
+  Miou_unix.write socket "\000\000\000\001\002"
+
+let request {socket; _} i off len =
+  let buf = Bytes.create 17 in
+  Bytes.blit_string "\000\000\000\013\006" 0 buf 0 5;
+  Bytes.set_int32_be buf 5 (Int32.of_int i);
+  Bytes.set_int32_be buf 9 (Int32.of_int off);
+  Bytes.set_int32_be buf 13 (Int32.of_int len);
+  Miou_unix.write socket (Bytes.unsafe_to_string buf)
+
+let wait {read_messages; send_keepalives; _} =
+  Miou.await_exn read_messages;
+  Miou.await_exn send_keepalives
+(* TODO: figure out if the first one raises an exception, what do we do with the second? *)
+
+let close {socket; read_messages; send_keepalives; _} =
+  Miou_unix.close socket;
+  Miou.cancel read_messages;
+  Miou.cancel send_keepalives
+(* TODO: is that correct use of cancel? *)

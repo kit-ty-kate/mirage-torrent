@@ -7,6 +7,7 @@ type subpiece = {
 type piece = {
   digest : Digestif.SHA1.t;
   data : bytes;
+  mutable checked : bool;
   subpieces : subpiece list; (* TODO: find a better datatype *)
 }
 
@@ -54,7 +55,8 @@ let rec chunk_file ~piece_length pieces length_remaining = function
       in
       let subpieces = chunk_piece length in
       let data = Bytes.create length in
-      let pieces = {digest; data; subpieces} :: pieces in
+      let checked = false in
+      let pieces = {digest; data; checked; subpieces} :: pieces in
       if Int64.compare left 0L < 0 then
         (pieces, xs)
       else
@@ -97,20 +99,20 @@ let set_subpiece {pieces; _} ~index ~offset str =
       Int.equal len length
     ) piece.subpieces
   in
-  if subpiece.initialized then
+  if subpiece.initialized then begin
     (* TODO: this should just be ignored *)
     print_endline "trying to overwrite already recieved data";
-  Bytes.blit_string str 0 piece.data offset length;
-  subpiece.initialized <- true (* TODO: if it is ever made multicore, this should be a mutex *)
+  end else begin
+    Bytes.blit_string str 0 piece.data offset length;
+    subpiece.initialized <- true; (* TODO: if it is ever made multicore, this should be a mutex *)
+    if List.for_all (fun {initialized; _} -> initialized) piece.subpieces then begin
+      if Digestif.SHA1.equal piece.digest (Digestif.SHA1.digest_bytes piece.data) then
+        piece.checked <- true
+      else
+        (* NOTE: something went wrong, so we need to try downloading again *)
+        List.iter (fun subpiece -> subpiece.initialized <- false) piece.subpieces
+    end
+  end
 
-let test {pieces; _} =
-  if
-    Array.for_all (fun {subpieces; _} ->
-      List.for_all (fun {initialized; _} ->
-        initialized
-      ) subpieces
-    ) pieces
-  then
-    print_endline "file has been downloaded!"
-  else
-    print_endline "downloading..."
+let checksum {pieces; _} =
+  Array.for_all (fun {checked; _} -> checked) pieces
