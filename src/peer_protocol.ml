@@ -25,14 +25,13 @@ let bt_fixed_handshake info_hash =
   Digestif.SHA1.to_raw_string info_hash
 
 let write_handshake fd fixed_handshake peer_id =
-  print_endline "writing...";
-  Miou_unix.write_string fd fixed_handshake;
-  Miou_unix.write_string fd peer_id
+  Miou_unix.write fd fixed_handshake;
+  Miou_unix.write fd peer_id
 
 let read_handshake fd fixed_handshake =
   let len = 68 in
   let buf = Bytes.create len in
-  Miou_unix.really_read fd buf 0 len;
+  Miou_unix.really_read fd buf ~len;
   if String.equal (Bytes.sub_string buf 0 20) (String.sub fixed_handshake 0 20) &&
      String.equal (Bytes.sub_string buf 28 20) (String.sub fixed_handshake 28 20) then
     (* TODO: we ignore peer_id because it seems unused (compact form) *)
@@ -41,18 +40,19 @@ let read_handshake fd fixed_handshake =
     failwith ("?? " ^ Bytes.to_string buf)
 
 let send_keepalive fd =
-  Miou_unix.write_string fd "\000\000\000\000"
+  print_endline "send keepalive";
+  Miou_unix.write fd "\000\000\000\000"
 
 let read_message fd =
   let buf = Bytes.create 4 in
-  Miou_unix.really_read fd buf 0 4;
+  Miou_unix.really_read fd buf ~len:4;
   let len = Bytes.get_int32_be buf 0 in
   if len = 0l then
     Keepalive
   else
     let len = Int32.to_int len in
     let buf = Bytes.create len in
-    Miou_unix.really_read fd buf 0 len;
+    Miou_unix.really_read fd buf ~len;
     let message = Bytes.unsafe_to_string buf in
     match String.unsafe_get message 0 with
     | '\000' -> Choke
@@ -94,6 +94,20 @@ let read_message fd =
           failwith "unsupported length for Cancel message"
     | _ -> failwith "unknown message"
 
+let request_the_entire_torrent torrent_output socket =
+  Torrent_output.iter_subpieces (fun i off len ->
+    print_endline "wtf";
+    Miou_unix.sleep 5.0;
+    Printf.printf "Request one more...(%d, %d, %d)\n" i off len;
+    Miou_unix.write socket "\000\000\000\014\006"; (* NOTE: request *)
+    let buf = Bytes.create 13 in
+    Bytes.set_int32_be buf 0 (Int32.of_int i);
+    Bytes.set_int32_be buf 4 (Int32.of_int off);
+    Bytes.set_int32_be buf 8 (Int32.of_int len);
+    Miou_unix.write socket (Bytes.unsafe_to_string buf);
+    print_endline "request one sent";
+  ) torrent_output
+
 let talk torrent_file {Trackers.ip; port; _} =
   let socket = Miou_unix.tcpv4 () in
   Fun.protect ~finally:(fun () -> Miou_unix.close socket) @@ fun () ->
@@ -108,23 +122,69 @@ let talk torrent_file {Trackers.ip; port; _} =
   Miou.await_exn write_handshake;
   let _client_peer_id = Miou.await_exn read_handshake in
   (* TODO: use client_peer_id ? *)
+  let torrent_output = Torrent_output.create torrent_file in
   let send_keepalives =
     Miou.call_cc (fun () ->
+      Miou_unix.sleep 1.0;
+      Miou_unix.write socket "\000\000\000\001\001"; (* NOTE: unchoke *)
+      Miou_unix.sleep 1.0;
+      Miou_unix.write socket "\000\000\000\001\002"; (* NOTE: interested *)
       while true do (* TODO: Have a way to stop this program *)
-        Miou_unix.sleep 120.0;
         send_keepalive socket;
+        Miou_unix.sleep 120.0;
       done
     )
   in
   let read_messages =
     Miou.call_cc (fun () ->
       while true do
-        let _message = read_message socket in
-        ignore _message
-        (* TODO *)
+        print_endline "reading message..";
+        match read_message socket with
+        | Keepalive ->
+            print_endline "keepalive";
+        | Choke ->
+            print_endline "choke";
+        | Unchoke ->
+            print_endline "unchoke";
+        | Interested ->
+            print_endline "interested";
+        | Not_interested ->
+            print_endline "not interested";
+        | Have _ ->
+            print_endline "have";
+        | Bitfield _ ->
+            print_endline "bitfield"
+        | Request _ ->
+            print_endline "request";
+        | Piece {index; offset; piece} ->
+            print_endline "piece";
+            let index = Int32.to_int index in (* TODO: do we need int32 and int64 datatypes? *)
+            let offset = Int32.to_int offset in (* TODO: do we need int32 and int64 datatypes? *)
+            Torrent_output.set_subpiece torrent_output ~index ~offset piece;
+            print_endline "successfully set piece";
+        | Cancel _ ->
+            print_endline "cancel"
       done
     )
   in
+  let check_received =
+    Miou.call_cc (fun () ->
+      while true do
+        Miou_unix.sleep 120.0;
+        Torrent_output.test torrent_output;
+      done
+    )
+  in
+  let test_requesting =
+    Miou.call_cc (fun () ->
+      Miou_unix.sleep 5.0;
+      print_endline "requesting...";
+      request_the_entire_torrent torrent_output socket;
+      print_endline "requested...";
+    )
+  in
   Miou.await_exn read_messages;
-  Miou.await_exn send_keepalives
+  Miou.await_exn send_keepalives;
+  Miou.await_exn check_received;
+  Miou.await_exn test_requesting
 (* TODO: support uploads *)

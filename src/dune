@@ -4,7 +4,6 @@
   bencode
   digestif.ocaml
 ;  logs.fmt
-  dns-miou
   miou.unix
   httpcats
   mirage-crypto-rng.unix

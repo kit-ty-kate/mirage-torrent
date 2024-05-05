@@ -11,7 +11,14 @@ type t = {
 
 exception Request_error
 
-let request {Torrent_file.announce; peer_id; info_hash; _} =
+let calculate_length = function
+  | Torrent_file.Length len -> len
+  | Torrent_file.Files files ->
+      List.fold_left (fun acc {Torrent_file.length; _} ->
+        Int64.add acc length
+      ) 0L files
+
+let request {Torrent_file.announce; peer_id; info_hash; length_or_files; _} =
 (*  Logs.set_level (Some Logs.Debug);
     Logs.set_reporter (Logs_fmt.reporter ()); *)
   let url =
@@ -21,7 +28,7 @@ let request {Torrent_file.announce; peer_id; info_hash; _} =
       "port", "6881"; (* TODO: change this *)
       "uploaded", "0";
       "downloaded", "0";
-      "left", "0";
+      "left", Int64.to_string (calculate_length length_or_files);
       "compact", "1"; (* NOTE: see http://www.bittorrent.org/beps/bep_0023.html *)
     ]
   in
