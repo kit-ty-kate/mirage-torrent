@@ -25,7 +25,7 @@ jobs:
         uses: Cyberboss/install-winget@v1
 
       - name: Update PATH
-        run: Add-Content $env:GITHUB_PATH "LOCALAPPDATA\Microsoft\WinGet\Links"
+        run: Add-Content $env:GITHUB_PATH "$Env:LOCALAPPDATA\Microsoft\WinGet\Links"
 
       - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
         uses: kit-ty-kate/setup-ocaml@win52
