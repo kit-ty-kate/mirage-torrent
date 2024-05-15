@@ -28,6 +28,9 @@ jobs:
         uses: kit-ty-kate/setup-ocaml@win52
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          allow-prerelease-opam: true
+          opam-repositories: |
+            default: https://github.com/dra27/opam-repository.git#windows-initial
 
       - run: opam install . --deps-only --with-test
 
