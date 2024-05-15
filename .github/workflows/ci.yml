@@ -1,0 +1,36 @@
+name: Builds, tests & co
+
+on:
+  pull_request:
+
+permissions: read-all
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+        ocaml-compiler:
+          - "4.14"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout tree
+        uses: actions/checkout@v4
+
+      - name: Install winget
+        uses: Cyberboss/install-winget@v1
+
+      - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
+        uses: kit-ty-kate/setup-ocaml@win52
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - run: opam install . --deps-only --with-test
+
+      - run: opam exec -- dune build
+
+      - run: opam exec -- dune runtest
