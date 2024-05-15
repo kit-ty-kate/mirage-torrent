@@ -27,16 +27,22 @@ jobs:
       - name: Update PATH
         run: Add-Content $env:GITHUB_PATH "$Env:LOCALAPPDATA\Microsoft\WinGet\Links"
 
-      - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
-        uses: kit-ty-kate/setup-ocaml@win52
-        with:
-          ocaml-compiler: ${{ matrix.ocaml-compiler }}
-          allow-prerelease-opam: true
-          opam-repositories: |
-            default: https://github.com/dra27/opam-repository.git#windows-initial
+      - name: install
+        run: winget install --accept-source-agreements --accept-package-agreements opam
 
-      - run: opam install . --deps-only --with-test
+      - name: test
+        run: dir "$Env:LOCALAPPDATA\Microsoft\WinGet\Links"
 
-      - run: opam exec -- dune build
-
-      - run: opam exec -- dune runtest
+#      - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
+#        uses: kit-ty-kate/setup-ocaml@win52
+#        with:
+#          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+#          allow-prerelease-opam: true
+#          opam-repositories: |
+#            default: https://github.com/dra27/opam-repository.git#windows-initial
+#
+#      - run: opam install . --deps-only --with-test
+#
+#      - run: opam exec -- dune build
+#
+#      - run: opam exec -- dune runtest
