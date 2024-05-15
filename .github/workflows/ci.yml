@@ -17,9 +17,6 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
-    env:
-      PATHEXT: "env:LOCALAPPDATA/Microsoft/WinGet/Links/"
-
     steps:
       - name: Checkout tree
         uses: actions/checkout@v4
@@ -29,6 +26,7 @@ jobs:
 
       - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
         uses: kit-ty-kate/setup-ocaml@win52
+        shell: powershell
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           allow-prerelease-opam: true
