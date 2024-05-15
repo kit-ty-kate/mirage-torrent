@@ -17,6 +17,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    env:
+      PATHEXT: %LOCALAPPDATA%/Microsoft/WinGet/Links/
+
     steps:
       - name: Checkout tree
         uses: actions/checkout@v4
