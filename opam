@@ -1,0 +1,24 @@
+opam-version: "2.0"
+name: "mirage-torrent"
+version: "0.0.1~"
+synopsis: "WIP"
+license: "BSD-1-Clause"
+maintainer: "Kate <kit-ty-kate@outlook.com>"
+authors: [
+  "Kate <kit-ty-kate@outlook.com>"
+]
+homepage: "https://github.com/kit-ty-kate/mirage-torrent"
+dev-repo: "git+https://github.com/kit-ty-kate/mirage-torrent"
+bug-reports: "https://github.com/kit-ty-kate/mirage-torrent/issues"
+build: ["dune" "build" "-p" name "-j" jobs]
+depends: [
+  "ocaml" {>= "4.08"}
+  "dune" {>= "2.0"}
+  "bencode" {>= "2.0"}
+  "digestif" {>= "1.2.0"}
+  "miou" {>= "0.3.0"}
+  "httpcats" {>= "0.0.1"}
+  "mirage-crypto-rng" {>= "1.1.0"}
+  "ipaddr" {>= "5.6.0"}
+  "uri" {>= "4.4.0"}
+]
