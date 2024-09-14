@@ -108,14 +108,14 @@ let connect torrent_file torrent_output {Trackers.ip; port; _} =
     (* NOTE: see http://www.bittorrent.org/beps/bep_0003.html *)
     let fixed_handshake = bt_fixed_handshake torrent_file.Torrent_file.info_hash in
     let write_handshake =
-      Miou.call_cc (fun () -> write_handshake socket fixed_handshake torrent_file.Torrent_file.peer_id)
+      Miou.async (fun () -> write_handshake socket fixed_handshake torrent_file.Torrent_file.peer_id)
     in
-    let read_handshake = Miou.call_cc (fun () -> read_handshake socket fixed_handshake) in
+    let read_handshake = Miou.async (fun () -> read_handshake socket fixed_handshake) in
     Miou.await_exn write_handshake;
     let _client_peer_id = Miou.await_exn read_handshake in
     (* TODO: use client_peer_id ? *)
     let send_keepalives =
-      Miou.call_cc (fun () ->
+      Miou.async (fun () ->
         while true do
           send_keepalive socket;
           Miou_unix.sleep 120.0;
@@ -123,7 +123,7 @@ let connect torrent_file torrent_output {Trackers.ip; port; _} =
       )
     in
     let read_messages =
-      Miou.call_cc (fun () ->
+      Miou.async (fun () ->
         while true do
           match read_message socket with
           | Keepalive ->

@@ -33,8 +33,9 @@ let request {Torrent_file.announce; peer_id; info_hash; length_or_files; _} =
     ]
   in
   match
-    Httpcats.request ~meth:`GET ~follow_redirect:true ~uri:(Uri.to_string url) ~f:(fun _resp acc body ->
-      acc ^ body
+    Httpcats.request ~meth:`GET ~follow_redirect:true ~uri:(Uri.to_string url) ~f:(fun _meta _resp acc -> function
+      | None -> acc
+      | Some body -> acc ^ body
     ) ""
   with
   | Ok (_resp, body) ->

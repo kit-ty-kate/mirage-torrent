@@ -21,7 +21,7 @@ let () =
         Peer_protocol.interested proto;
         Torrent_output.iter_subpieces (Peer_protocol.request proto) torrent_output;
         let test =
-          Miou.call_cc (fun () ->
+          Miou.async (fun () ->
             let finished = ref false in
             while not !finished do
               Miou_unix.sleep 5.0;
